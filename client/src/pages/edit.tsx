@@ -21,38 +21,54 @@ const EditPage = () => {
     }
     fetchProduct()
   }, [])
-  console.log(product)
 
   if (loading) {
-    return <div>loading...</div>
+    return <div className="text-muted-foreground">Loading product...</div>
   }
 
-  const editProduct = async (value: { name: string, description?: string, price?: number, image?: string }) => {
-    try {
-      const res = await fetch(`http://localhost:4000/api/products/${product?.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: value.name,
-          description: value.description,
-          price: Number(value.price),
-          image_url: value.image,
-        }),
-      });
-      if (res.ok) {
-        toast.success("Product created successfully")
-        navigate("/")
-      }
+  if (!product) {
+    return <div>Product not found</div>
+  }
+
+  const editProduct = async (value: {
+    name: string
+    description?: string
+    price?: number
+    image?: File
+  }) => {
+    const formData = new FormData()
+
+    formData.append("name", value.name)
+    if (value.description) {
+      formData.append("description", value.description)
     }
-    catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message)
+
+    formData.append("price", String(value.price))
+
+    if (value.image) {
+      formData.append("image", value.image)
+    }
+
+    try {
+      const res = await fetch(
+        `http://localhost:4000/api/products/${product.id}`,
+        {
+          method: "PUT",
+          body: formData,
+        }
+      )
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.message || "Failed to update product")
       }
-      else {
-        toast.error("Unkown Error")
-      }
+
+      toast.success("Product updated successfully")
+      navigate("/")
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unknown error"
+      )
     }
   }
   return (

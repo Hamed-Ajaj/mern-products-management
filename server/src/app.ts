@@ -12,7 +12,7 @@ export const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:4173"],
+    origin: ["http://localhost:5173", "http://localhost:4173", "http://localhost:3000"],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   }),
@@ -94,8 +94,6 @@ app.post('/api/products',
   upload.single("image"),
   validate({ body: createProductSchema }), async (req, res) => {
 
-    console.log("BODY:", req.body)
-    console.log("FILE:", req.file)
     const { name, description, price } = req.body;
 
     if (req.file && !req.file.mimetype.startsWith("image/")) {
@@ -122,39 +120,50 @@ app.post('/api/products',
 
 app.put(
   "/api/products/:id",
-  validate({
-    body: updateProductSchema,
-    params: z.object({ id: z.coerce.number() }),
-  }),
+  upload.single("image"),
   async (req, res) => {
     try {
-      const { name, description, price, image_url } = req.body
+      const { name, description, price } = req.body
       const { id } = req.params
 
-      const sql =
-        "UPDATE products SET name = ?, description = ?, price = ?, image_url = ? WHERE id = ?"
+      if (req.file && !req.file.mimetype.startsWith("image/")) {
+        return res.status(400).json({ message: "Invalid file type" })
+      }
 
-      const [result] = await db.query<ResultSetHeader>(sql, [
-        name,
-        description,
-        price,
-        image_url,
-        id,
-      ])
+      const [rows] = await db.query<any[]>(
+        "SELECT image_url FROM products WHERE id = ?",
+        [id]
+      )
 
-      if (result.affectedRows === 0) {
+      if (rows.length === 0) {
         return res.status(StatusCodes.NOT_FOUND).json({
           message: "Product not found",
           success: false,
         })
       }
 
+      // by default it's the old image, if the use change it it will be updated
+      let image_url = rows[0].image_url
+
+      if (req.file) {
+        image_url = `/uploads/${req.file.filename}`
+      }
+
+      const [result] = await db.query<ResultSetHeader>(
+        `
+        UPDATE products
+        SET name = ?, description = ?, price = ?, image_url = ?
+        WHERE id = ?
+        `,
+        [name, description, price, image_url, id]
+      )
+
       return res.sendStatus(StatusCodes.NO_CONTENT)
     } catch (error) {
       console.error("Update product error:", error)
 
       return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-        message: "Failed to update product",
+        message: error,
         success: false,
       })
     }

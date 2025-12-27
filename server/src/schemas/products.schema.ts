@@ -4,11 +4,19 @@ export const createProductSchema = z.object({
   name: z.string().min(1, "Name is required"),
   price: z.coerce.number().positive("Price must be positive"),
   description: z.string().optional(),
-  image_url: z.string().optional(),
 });
 
-export const updateProductSchema = createProductSchema.partial().refine(data => Object.keys(data).length > 0, {
-  message: "At least one field is required",
+export const updateProductSchema = z.object({
+  name: z.string().min(3),
+
+  description: z
+    .string()
+    .min(20)
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v === "" ? undefined : v)),
+
+  price: z.coerce.number().positive(),
 })
 
 export const querySchema = z.object({
